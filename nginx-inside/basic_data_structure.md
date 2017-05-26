@@ -1,15 +1,15 @@
 # nginx基本数据类型  
 ## 整形数据  
--有符号整数 ngx_int_t
--无符号整数 ngx_uint_t
--开关类型，ngx_flag_t
->实际定义与ngx_int_t一致，用于表示某些选项的开关.例如 
+- 有符号整数 ngx_int_t
+- 无符号整数 ngx_uint_t
+- 开关类型，ngx_flag_t
+> 实际定义与ngx_int_t一致，用于表示某些选项的开关.例如 
 		multi_accept on		对应ngx_flag_t变量的值为1   
 		multi_accept off		对应ngx_flag_t变量的值为10
 
 ## 字符串类型  
->nginx对字符串进行了自己的封装，特点是通过指针和长度来表示，**没有使用‘\0’作为字符串的结束符**。
->定义如下：
+> nginx对字符串进行了自己的封装，特点是通过指针和长度来表示，**没有使用‘\0’作为字符串的结束符**。
+> 定义如下：
 ```c
 /*
 src/core/ngx_string.h
@@ -148,7 +148,7 @@ typedef struct {
     size_t       size;    //单位：字节
 } ngx_bufs_t;
 ```
-##ngx_chain_t
+## ngx_chain_t
 此结构用于管理ngx_buf_t链，使其形成一个单项链表。
 定义如下：
 ```c
