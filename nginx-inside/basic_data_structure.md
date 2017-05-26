@@ -5,7 +5,7 @@
 - 开关类型，ngx_flag_t
 > 实际定义与ngx_int_t一致，用于表示某些选项的开关.例如 
 		multi_accept on		对应ngx_flag_t变量的值为1   
-		multi_accept off		对应ngx_flag_t变量的值为10
+		multi_accept off		对应ngx_flag_t变量的值为0
 
 ## 字符串类型  
 > nginx对字符串进行了自己的封装，特点是通过指针和长度来表示，**没有使用‘\0’作为字符串的结束符**。
@@ -61,9 +61,141 @@ typedef struct {
 } ngx_keyval_t;
 
 ```
-## ngx_list_t
-## ngx_queue_t
 ## ngx_array_t
+ngx_array_t 是一个顺序容器，它在 Nginx 中大量使用。 ngx_array_t 容器以数组的形式存储元素，并支持在达到数组容量的上限时**动态**改变数组的大小。
+定义如下：
+```c
+/*
+src/core/ngx_array.h
+*/
+typedef struct {
+    void        *elts;  /* 指向数组数据区域的首地址 */
+    ngx_uint_t   nelts; /* 数组实际元素的个数 */
+    size_t       size;  /* 单个元素所占据的字节大小 */
+    ngx_uint_t   nalloc;/* 数组容量，最多存储元素个数 */
+    ngx_pool_t  *pool;  /* 数组对象所在的内存池， 数组数据区域所需的空间都由这个pool来提供*/
+} ngx_array_t;
+```
+动态数组支持的基本操作:
+```c
+/*
+src/core/ngx_array.c
+*/
+/* 创建新的动态数组 */
+ngx_array_t *ngx_array_create(ngx_pool_t *p, ngx_uint_t n, size_t size);
+/* 销毁数组对象，内存被内存池回收 */
+void ngx_array_destroy(ngx_array_t *a);
+/* 在现有数组中增加一个新的元素 */
+void *ngx_array_push(ngx_array_t *a);
+/* 在现有数组中增加 n 个新的元素 */
+void *ngx_array_push_n(ngx_array_t *a, ngx_uint_t n);
+```
+## ngx_list_t
+ngx_list_t 是 Nginx 封装的单向链表容器。
+Nginx 链表容器和普通链表类似，均有链表表头和链表节点，通过节点指针组成链表。其结构定义如下：
+```c
+/*
+src/core/ngx_list.h
+*/
+/* 链表结构 */
+typedef struct ngx_list_part_s  ngx_list_part_t;
+
+/* 链表中的节点结构 */
+struct ngx_list_part_s {
+    void             *elts; /* 指向该节点数据区的首地址 */
+    ngx_uint_t        nelts;/* 该节点数据区实际存放的元素个数 */
+    ngx_list_part_t  *next; /* 指向链表的下一个节点 */
+};
+
+/* 链表表头结构 */
+typedef struct {
+    ngx_list_part_t  *last; /* 指向链表中最后一个节点 */
+    ngx_list_part_t   part; /* 链表中表头包含的第一个节点 */
+    size_t            size; /* 元素的字节大小 */
+    ngx_uint_t        nalloc;/* 链表中每个节点所能容纳元素的个数 */
+    ngx_pool_t       *pool; /* 该链表节点空间的内存池对象 */
+} ngx_list_t;
+```
+链表支持的基本操作只有两个：
+```c
+/* 创建链表 */
+ngx_list_t * ngx_list_create(ngx_pool_t *pool, ngx_uint_t n, size_t size);
+
+/* 添加一个元素 */
+void * ngx_list_push(ngx_list_t *l);
+```
+由于链表的内存分配是基于内存池，所有内存的销毁由内存池进行，即链表没有销毁操作。
+## ngx_queue_t
+nginx的双向循环链表结构。在 Nginx 的队列实现中，实质就是具有头节点的双向循环链表，这里的双向链表中的节点是没有数据区的，只有两个指向节点的指针。需注意的是队列链表的内存分配不是直接从内存池分配的，即没有进行内存池管理，而是需要我们自己管理内存，所有我们可以指定它在内存池管理或者直接在堆里面进行管理，最好使用内存池进行管理。节点结构定义如下：
+
+```c
+/* 队列结构，其实质是具有有头节点的双向循环链表 */
+typedef struct ngx_queue_s  ngx_queue_t;
+
+/* 队列中每个节点结构，只有两个指针，并没有数据区 */
+struct ngx_queue_s {
+    ngx_queue_t  *prev;
+    ngx_queue_t  *next;
+};
+```
+基本操作如下：
+```c
+/* h 为链表结构体 ngx_queue_t 的指针；初始化双链表 */
+ngx_queue_int(h)
+
+/* h 为链表容器结构体 ngx_queue_t 的指针； 判断链表是否为空 */
+ngx_queue_empty(h)
+
+/* h 为链表容器结构体 ngx_queue_t 的指针，x 为插入元素结构体中 ngx_queue_t 成员的指针；将 x 插入到链表头部 */
+ngx_queue_insert_head(h, x)
+
+/* h 为链表容器结构体 ngx_queue_t 的指针，x 为插入元素结构体中 ngx_queue_t 成员的指针。将 x 插入到链表尾部 */
+ngx_queue_insert_tail(h, x)
+
+/* h 为链表容器结构体 ngx_queue_t 的指针。返回链表容器 h 中的第一个元素的 ngx_queue_t 结构体指针 */
+ngx_queue_head(h)
+
+/* h 为链表容器结构体 ngx_queue_t 的指针。返回链表容器 h 中的最后一个元素的 ngx_queue_t 结构体指针 */
+ngx_queue_last(h)
+
+/* h 为链表容器结构体 ngx_queue_t 的指针。返回链表结构体的指针 */
+ngx_queue_sentinel(h)
+
+/* x 为链表容器结构体 ngx_queue_t 的指针。从容器中移除 x 元素 */
+ngx_queue_remove(x)
+
+/* h 为链表容器结构体 ngx_queue_t 的指针。该函数用于拆分链表，
+ * h 是链表容器，而 q 是链表 h 中的一个元素。
+ * 将链表 h 以元素 q 为界拆分成两个链表 h 和 n
+ */
+ngx_queue_split(h, q, n)
+
+/* h 为链表容器结构体 ngx_queue_t 的指针， n为另一个链表容器结构体 ngx_queue_t 的指针
+ * 合并链表，将 n 链表添加到 h 链表的末尾
+ */
+ngx_queue_add(h, n)
+
+/* h 为链表容器结构体 ngx_queue_t 的指针。返回链表中心元素，即第 N/2 + 1 个 */
+ngx_queue_middle(h)
+
+/* h 为链表容器结构体 ngx_queue_t 的指针，cmpfunc 是比较回调函数。使用插入排序对链表进行排序 */
+ngx_queue_sort(h, cmpfunc)
+
+/* q 为链表中某一个元素结构体的 ngx_queue_t 成员的指针。返回 q 元素的下一个元素。*/
+ngx_queue_next(q)
+
+/* q 为链表中某一个元素结构体的 ngx_queue_t 成员的指针。返回 q 元素的上一个元素。*/
+ngx_queue_prev(q)
+
+/* q 为链表中某一个元素结构体的 ngx_queue_t 成员的指针，type 是链表元素的结构体类型名称，
+ * link 是上面这个结构体中 ngx_queue_t 类型的成员名字。返回 q 元素所属结构体的地址
+ */
+ngx_queue_data(q, type, link)
+
+/* q 为链表中某一个元素结构体的 ngx_queue_t 成员的指针，x 为插入元素结构体中 ngx_queue_t 成员的指针 */
+ngx_queue_insert_after(q, x)
+```
+
 ## ngx_buf_t
 nginx在处理数据时，大量使用ngx_buf_t数据结构，用来保存从网络上收到的数据或在要发送到网络上的数据。
 在不同的场景下，ngx_buf_t中的各个指针代表着不同的意义。
