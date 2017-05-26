@@ -1,5 +1,5 @@
-#nginx基本数据类型
-##整形数据
+# nginx基本数据类型  
+## 整形数据  
 -有符号整数 ngx_int_t
 -无符号整数 ngx_uint_t
 -开关类型，ngx_flag_t
@@ -7,7 +7,7 @@
 		multi_accept on		对应ngx_flag_t变量的值为1   
 		multi_accept off		对应ngx_flag_t变量的值为10
 
-##字符串类型
+## 字符串类型  
 >nginx对字符串进行了自己的封装，特点是通过指针和长度来表示，**没有使用‘\0’作为字符串的结束符**。
 >定义如下：
 ```c
@@ -47,8 +47,8 @@ ngx_str_null(&str2);
 
 ```
 
-#ngx基本数据结构
-##ngx_keyval_t
+# ngx基本数据结构  
+## ngx_keyval_t  
 用于存储key-value对，比如各种http header的名字和值。
 定义为
 ```c
@@ -61,10 +61,10 @@ typedef struct {
 } ngx_keyval_t;
 
 ```
-##ngx_list_t
-##ngx_queue_t
-##ngx_array_t
-##ngx_buf_t
+## ngx_list_t
+## ngx_queue_t
+## ngx_array_t
+## ngx_buf_t
 nginx在处理数据时，大量使用ngx_buf_t数据结构，用来保存从网络上收到的数据或在要发送到网络上的数据。
 在不同的场景下，ngx_buf_t中的各个指针代表着不同的意义。
 比如，经典的生产者/消费者场景，同时操作一个ngx_buf_t时：
@@ -133,7 +133,7 @@ struct ngx_buf_s {
     /* STUB */ int   num;
 };
 ```
-##ngx_bufs_t
+## ngx_bufs_t
 用来表示缓存区的大小和数量。
 比如，在配置文件中，我们配置
 >gzip_buffers 8 48k
@@ -160,8 +160,8 @@ struct ngx_chain_s {
     ngx_chain_t  *next;
 };
 ```
-#ngx高级数据结构
-##ngx_hash_t
-##ngx_radix_tree_t
-##ngx_rbtree_t
-##ngx_pool_t
+# ngx高级数据结构
+## ngx_hash_t
+## ngx_radix_tree_t
+## ngx_rbtree_t
+## ngx_pool_t
