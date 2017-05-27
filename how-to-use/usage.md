@@ -30,3 +30,12 @@
 	
 - 检查安装
 	如果使用默认的nginx.conf，安装完毕后，在浏览器里输入 localhost， 如果显示nginx的欢迎界面，就表示一切顺利，成功安装了。
+	
+- 更新nginx程序
+	-- 获得正在运行的nginx master的进程号n
+		ps uax|grep nginx|grep master
+	-- kill -WINCH n   //发送WINCH信号到旧的nginx主进程以杀掉旧的nginx子进程
+	-- kill -QUIT n  // 退出旧的nginx主进程 
+	-- rm -rf /usr/local/nginx/sbin/nginx.old  //删除老版本
+	--现在新版本的nginx就已经替换老的nginx了，而且实现了不停机升级。
+	

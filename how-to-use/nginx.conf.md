@@ -158,8 +158,16 @@ http
     #sendfile指令指定 nginx 是否调用sendfile 函数（zero copy 方式）来输出文件，对于普通应用，必须设为on。如果用来进行下载等应用磁盘IO重负载应用，可设置为off，以平衡磁盘与网络IO处理速度，降低系统uptime。
     sendfile on;
 
-    #开启目录列表访问，合适下载服务器，默认关闭。
+    #开启目录列表访问，合适下载服务器，默认关闭。意思是访问的资源不存在时，将返回root指令指定的目录内容；如果没有指定root，则默认返回安装目录下的html目录
     #autoindex on;
+    
+    #指令功能：设置是否显示文件确切大小，默认为on
+    #指令格式：autoindex_exact_size [on | off]
+    #autoindex_exact_size off
+    
+    #指令功能：设置是否显示文件的本地时间，默认off，显示GMT时间；on，显示文件服务器时间。
+    #指令格式：autoindex_localtime [on | off]
+    #autoindex_localtime on
 
     #此选项允许或禁止使用socke的TCP_CORK的选项，此选项仅在使用sendfile的时候使用
     tcp_nopush on;
@@ -195,7 +203,7 @@ http
     #负载均衡配置
     #nginx支持同时设置多组的负载均衡，用来给不用的server来使用。
     upstream backend {
-     	#指令功能：设置上游服务器访问规则
+     	#指令功能：设置后端服务器访问规则
      	#指令格式：server [ip|servername]:port [weight=n] [down] [backup] [max_fails=n fail_timeout=time]  
      	        #down:表示单前的server暂时不参与负载
         	#weight:weight越大，负载的权重就越大。
@@ -210,7 +218,7 @@ http
         #server 192.168.80.125:80 backup;
 	#server 192.168.80.126:80 max_fails=2 fail_timeout=10s weight=2;
 	
-	#指令功能：设置挑选上游服务器的方法
+	#指令功能：设置挑选后端服务器的方法
 	#指令格式：[ip_hash | fair | hash_method algo]
         	#1、轮询（默认）
         		#每个请求按时间顺序逐一分配到不同的后端服务器，如果后端服务器down掉，能自动剔除。
@@ -232,15 +240,28 @@ http
     #虚拟主机的配置
     server
     {
-        #监听端口
+        #指令功能：设置监听端口
+        #指令格式： listen [ip|name:]port
+        #参考指令：
         listen 80;
-
-        #域名可以有多个，用空格隔开
+        listen xxx.xxx.xxx.xxx:8080;
+	
+        #指令功能：设置虚拟主机的域名
+        #指令格式：servername name1 [name2] [name3] ...;
+        #参考指令：
         server_name www.sample.com sample.com;
+        
+        #指令功能：设置默认页面
+        #指令格式：index xxx [xxx] [xxx];
+        #参考指令：
         index index.html index.htm index.php;
-        root /data/www/jd;
+        
+       #指令功能：设置虚拟服务器静态文件存储根目录
+        #指令格式：root path;
+        #参考指令：        
+        root /data/www/;
 
-        #对******进行负载均衡
+        #负载均衡
         location ~ .*.(php|php5)?$
         {
             fastcgi_pass 127.0.0.1:9000;
@@ -259,9 +280,7 @@ http
         #$http_referer：用来记录从那个页面链接访问过来的；
         #$http_user_agent：记录客户浏览器的相关信息；
         #通常web服务器放在反向代理的后面，这样就不能获取到客户的IP地址了，通过$remote_add拿到的IP地址是反向代理服务器的iP地址。反向代理服务器在转发请求的http头信息中，可以增加x_forwarded_for信息，用以记录原有客户端的IP地址和原来客户端的请求的服务器地址。
-        log_format access '$remote_addr - $remote_user [$time_local] "$request" '
-        '$status $body_bytes_sent "$http_referer" '
-        '"$http_user_agent" $http_x_forwarded_for';
+        log_format access '$remote_addr - $remote_user [$time_local] "$request" ' '$status $body_bytes_sent "$http_referer" '        '"$http_user_agent" $http_x_forwarded_for';
          
         #定义本虚拟主机的访问日志
         access_log  /usr/local/nginx/logs/host.access.log  main;
@@ -271,6 +290,22 @@ http
         location / {
             proxy_pass http://backend/;
             proxy_redirect off;
+            
+            #指令功能：在向一个后端服务器发送指令配置的请求失败时，继续向另外一台后端服务器发送这个请求。
+            #指令格式：proxy_next_upstream [error|timeout|invalid_header|http_500|http_502|http_503|http_504|http_404|off];
+            	#error：当向后端服务器发起连接、发送请求、读取响应时出错。
+		#timeout：发送请求或读取响应时发生超时。
+		#invalid_header：后端服务器发送的响应是不合法的。
+		#http_500：后端服务器返回的HTTP响应码是500。
+		#http_502：后端服务器返回的HTTP响应码是502。
+		#http_503：后端服务器返回的HTTP响应码是503。
+		#http_504：后端服务器返回的HTTP响应码是504。
+		#http_404：后端服务器返回的HTTP响应码是404。
+		#off：关闭proxy_next_upstream功能—出错就选择另一台后端服务器再次转发。
+            #默认指令
+            #proxy_next_upstream error timeout;
+            
+            
             proxy_set_header X-Real-IP $remote_addr;
              
             #后端的Web服务器可以通过X-Forwarded-For获取用户真实IP
@@ -316,20 +351,35 @@ http
             #设置在写入proxy_temp_path时数据的大小，预防一个工作进程在传递文件时阻塞太长
             #设定缓存文件夹大小，大于这个值，将从upstream服务器传
             proxy_temp_file_write_size 64k;
+            
+            
         }
          
          
         #设定查看Nginx状态的地址
         location /NginxStatus {
+        
             stub_status on;
+            #打开访问记录
             access_log on;
+            #认证
             auth_basic "NginxStatus";
             auth_basic_user_file confpasswd;
-            #htpasswd文件的内容可以用apache提供的htpasswd工具来产生。
+            #htpasswd文件的内容可以用apache提供的htpasswd工具来产生。使用命令：
+            #htpasswd -c htpasswd admin
+            #htpasswd htpasswd newuser
+            
+            #指令功能：设置允许客户端ip
+            #指令格式：allow [ip | ip/n ]
+            #参考指令：
+             allow 192.168.10.100;
+  		allow 172.29.73.0/24;
+  		
+  		deny all;
         }
          
         #本地动静分离反向代理配置
-        #所有jsp的页面均交由上游服务器处理
+        #所有jsp的页面均交由后端服务器处理
         location ~ .(jsp|jspx|do)?$ {
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
@@ -337,10 +387,12 @@ http
             proxy_pass http://backend;
         }
          
-        #所有静态文件由nginx直接读取不经过tomcat或resin
+        #所有静态文件由nginx直接读取，减轻后端服务器压力
         location ~ .*.(htm|html|gif|jpg|jpeg|png|bmp|swf|ioc|rar|zip|txt|flv|mid|doc|ppt|
         pdf|xls|mp3|wma)$
         {
+            #root指令指定文件所在目录，当main\server\location块中都出现root指令时，一般都以location里面的为准。
+            root /data/www/resource;
             expires 15d; 
         }
          
@@ -348,5 +400,40 @@ http
         {
             expires 1h;
         }
-    }
+        
+        #####nginx中变量的使用#####
+        
+        location /bar {
+        	#指令功能：给变量赋值
+        	#指令格式：set $var val;
+        	#参考指令：
+        	set $var bar;
+        	
+        	#echo指令属于echo模块，必须额外安装后才能使用
+        	echo "bar: $var";
+        	echo "args: $args";
+    	}
+    	#/foo 和 /bar 这两个“子请求”在处理过程中对变量 $var 各自所做的修改都丝毫没有影响到“主请求” /main
+    	location /foo {
+        	set $var foo;
+        	echo "foo: $var";
+        	echo "args: $args";
+    	}
+
+     	location /main {
+        	set $var main;
+        	# echo_location 发起的“子请求”，其执行是按照配置书写的顺序串行处理的，即只有当 /foo 请求处理完毕之后，才会接着处理 /bar 请求。这两个“子请求”的输出会按执行顺序拼接起来，作为 /main 接口的最终输出
+        	echo_location /foo "${args}&sub=foo";
+        	echo_location /bar "${args}&sub=bar";
+
+        	echo "main: $var";
+
+    	}
+    
+    	
+}
+
+
+
+
 ```
