@@ -38,15 +38,28 @@ http
 			#处理方法
 		}
 	}
-	
+	#虚拟主机配置，可以有多个server块，表示有多个主机
 	server
 	{
+	}
+}
+
+#stream块配置，nginx用作四层负载均衡时使用
+{
+	#负载均衡配置，如上游服务器列表，访问、缓存策略等
+	upstream xxx {
+	}
+	
+	server {
 	}
 }
 ```
 
 ## nginx.conf 详细配置指令说明
 参考 www.cnblogs.com/hunttown/p/5759959.html
+参考: www.nginx.org/en/docs/ngx_core_module.html
+参考: www.nginx.org/en/docs/stream/ngx_stream_core_module.html
+
 ```bash
 #指令功能：定义Nginx运行的用户和用户组
 #指令格式： user 用户名 [用户组]；
@@ -54,16 +67,25 @@ http
 user nobody;
 
 #指令功能：配置nginx进程数，建议设置为等于CPU总核心数。
-#指令格式： worker_processes n;
+#指令格式： worker_processes [n | auto ];
+	#auto 将自动设置成cpu核心数
 #参考指令
 worker_processes 1;
  
  #指令功能：设置cpu亲缘性，就是绑定worker到指定cpu上，使得worker不需要在多个cpu间进行切换，从而避免切换cpu带来的上下文恢复、调度开销，提高性能。
-#指令格式： worker_cpu_affinity mask
+#指令格式： worker_cpu_affinity [cpumask | auto] 
+	#auto 自动绑定到cpu
 #参考指令（四核）
 worker_cpu_affinity 0001 0010 0100 1000;
  
+
+  
+#指令功能：load一个动态编译的模块
+#指令格式：load_module file;
+#参考指令：
+#load_module modules/ngx_mail_module.so;
  
+
 #指令功能：全局错误日志配置
 #指令格式：error_log logfile [ debug | info | notice | warn | error | crit ]
 #参考指令
@@ -81,6 +103,7 @@ pid /usr/local/nginx/logs/nginx.pid;
 #参考配置
 worker_rlimit_nofile 65535;
 
+
 events 
 {
 	#指令功能：设置事件模型
@@ -89,15 +112,45 @@ events
 	use epoll;
 	
 	#指令功能：配置单个进程最大连接数（最大连接数=连接数*进程数）
-    			#根据硬件调整，和前面工作进程配合起来用，尽量大，但是别把cpu跑到100%就行。
-    	#指令格式： worker_connections n;
-    	#参考指令：
-    	worker_connections 65535;
+		#根据硬件调整，和前面工作进程配合起来用，尽量大，但是别把cpu跑到100%就行。
+	#指令格式： worker_connections n;
+	#参考指令：
+	worker_connections 65535;
 
-    	#指令功能：设置tcp连接keepalive超时时间，单位为秒；超过此时间，连接上还没有新的数据包到来，则关闭此连接。
-    	#指令格式：keepalive_timeout n;
-    	#参考指令：
-    	keepalive_timeout 60;
+ 
+	#指令功能：指定多个工作进程在接收新连接请求时，是否要先获取锁。此指令用在工作进程进行负载均衡时。因为一个新连接请求最终只会被一个worker接受，如果不使用锁，直接唤醒多个worker来竞争此请求时，没有竞争到此请求的进程白白浪费了cpu资源，产生“惊群”现象。如果设置了需要获取锁，则没有获得此锁的进程将不被唤醒。
+	#指令格式：accept_mutex on | off;
+	#默认指令：
+	#1.11.3之前
+	#accept_mutex on;
+	#1.11.3之后
+	accept_mutex off;
+	
+ 
+	#指令功能：accept_mutex 为on时，一个worker未竞争到锁后，等待多长时间再次竞争。
+	#指令格式：accept_mutex_delay time;
+	#默认指令：accept_mutex_delay 500ms;	
+
+	#指令功能：设置nginx是否以daemon模式运行
+	#指令格式：daemon on | off;
+	#默认指令：daemon on;
+	#在进行开发时，可以设置 daemon off; 获取更多nginx内部信息。
+
+	#指令功能：配置worker进程在接受新连接请求时，是一次接受一个请求还是一次接受当前所有请求。
+	#指令格式： multi_accept on | off;
+	#默认指令：multi_accept off;
+
+	#指令功能：设置指定的客户端连接使用debug级别的log；要使用此指令，nginx 在configure 时，要加上 --with-debug 
+	#指令格式：debug_connection address | CIDR | unix:;
+	#参考指令：
+	#debug_connection 127.0.0.1;
+	#debug_connection localhost;
+	#debug_connection 192.0.2.0/24;	
+	
+	#指令功能：设置tcp连接keepalive超时时间，单位为秒；超过此时间，连接上还没有新的数据包到来，则关闭此连接。
+	#指令格式：keepalive_timeout n;
+	#参考指令：
+	keepalive_timeout 60;
 
     	#指令功能：设置客户端请求头部的缓冲区大小。这个可以根据你的系统分页大小来设置，一般一个请求头的大小不会超过1k，不过由于一般系统分页都要大于1k，所以这里设置为分页大小。但也有client_header_buffer_size超过4k的情况，但是client_header_buffer_size该值必须设置为“系统分页大小”的整倍数。
     	#指令格式：client_header_buffer_size n;
@@ -132,7 +185,8 @@ events
 #设定http服务器，利用它的反向代理功能提供负载均衡支持
 http
 {
-    #文件扩展名与文件类型映射表
+    #指令功能：include另外一个文件到本conf中，用于分散配置
+    #参考指令：文件扩展名与文件类型映射表
     include mime.types;
 
     #默认文件类型
@@ -241,10 +295,19 @@ http
     server
     {
         #指令功能：设置监听端口
-        #指令格式： listen [ip|name:]port
+        #指令格式： listen [address:]port [ssl] [udp] [backlog=n] [rcvbuf=size] [sndbuf=size] 
+        	#这里只列出比较常用的参数，详细参数列表和说明见 nginx.org/en/docs/stream/ngx_stream_core_module.html
+        	#ssl：所有连接都要使用ssl
+        	#udp：网络层协议使用udp，默认为tcp
+        	#backlog：指定待accept的连接最大数量，超过这个数量直接拒绝客户端的连接请求
+        	#rcvbuf：socket上接收数据包缓存大小
+        	#sndbuf：socket上发送数据包缓存大小
         #参考指令：
         listen 80;
         listen xxx.xxx.xxx.xxx:8080;
+        listen 127.0.0.1:12345;
+	listen *:12345;
+	listen localhost:12345;
 	
         #指令功能：设置虚拟主机的域名
         #指令格式：servername name1 [name2] [name3] ...;
@@ -433,7 +496,39 @@ http
     	
 }
 
+stream {
+    upstream backend {
+        hash $remote_addr consistent;
 
+        server backend1.example.com:12345 weight=5;
+        server 127.0.0.1:12345            max_fails=3 fail_timeout=30s;
+    }
+
+    upstream dns {
+       server 192.168.0.1:53535;
+       server dns.example.com:53;
+    }
+
+    server {
+        listen 12345;
+        proxy_connect_timeout 1s;
+        proxy_timeout 3s;
+        proxy_pass backend;
+    }
+
+    server {
+    	#四层负载均衡，不需要location块
+        listen 127.0.0.1:53 udp;
+        proxy_responses 1;
+        proxy_timeout 20s;
+        proxy_pass dns;
+    }
+
+    server {
+        listen [::1]:12345;
+        proxy_pass unix:/tmp/stream.socket;
+    }
+}
 
 
 ```
