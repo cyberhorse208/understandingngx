@@ -22,7 +22,7 @@ http
 {
 	#http相关全局配置
 	
-	#负载均衡配置，如上游服务器列表，访问、缓存策略等
+	#7层负载均衡配置，如上游服务器列表，访问、缓存策略等
 	upstream xxx 
 	{
 		server xxxxx
@@ -46,7 +46,7 @@ http
 
 #stream块配置，nginx用作四层负载均衡时使用
 {
-	#负载均衡配置，如上游服务器列表，访问、缓存策略等
+	#负载均衡配置，如上游服务器列表，访问策略等
 	upstream xxx {
 	}
 	
@@ -56,9 +56,9 @@ http
 ```
 
 ## nginx.conf 详细配置指令说明
-参考 www.cnblogs.com/hunttown/p/5759959.html
-参考: www.nginx.org/en/docs/ngx_core_module.html
-参考: www.nginx.org/en/docs/stream/ngx_stream_core_module.html
+- 参考 www.cnblogs.com/hunttown/p/5759959.html
+- 参考: www.nginx.org/en/docs/ngx_core_module.html
+- 参考: www.nginx.org/en/docs/stream/ngx_stream_core_module.html
 
 ```bash
 #指令功能：定义Nginx运行的用户和用户组
