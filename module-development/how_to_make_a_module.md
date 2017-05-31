@@ -23,7 +23,9 @@
 
 ## 2. 静态加载模块
 - 静态加载官方模块
+
 	在configure时，添加 --with-xxx 即可，比如
+	
 ```bash
 ./configure --with-http_geoip_module \
 　　--with-http_image_filter_module  \
@@ -32,16 +34,23 @@
 　　--with-http_xslt_module 
 ```
 - 静态加载第三方模块
+
 	在configure时，添加--add-module=path_to_module_dir  即可，比如
+	
 ```bash
 	./configure --add-module=/home/will/nginx-1.12.0/work/modules/upstream
 ```	
 	
 ## 3. 动态加载模块
+
 采用动态加载的模块，编译完成后，生成对应模块名字.so 的文件在编译目录的objs目录下。
+
 可以再make install将模块自动安装到 nginx的安装目录的子目录modules下。
+
 - 动态加载官方模块
+
 	在configure时，添加 --with-xxx=dynamic 即可，比如
+
 ```bash
 ./configure --with-http_geoip_module=dynamic \
 　　--with-http_image_filter_module=dynamic \
@@ -50,8 +59,11 @@
 　　--with-http_xslt_module=dynamic
 ```
 - 动态加载第三方模块
+
 	模块如果想要编译成动态链接库，那么**必须使用新版本的模块config文件**（1.9.11后推荐使用的config文件）.
+
 	在configure时，添加 --add-dynamic-module=path_to_module_dir 即可，比如：
+
 ```bash
 	./configure --add-dynamic-module=/home/will/nginx-1.12.0/work/modules/upstream
 ```
