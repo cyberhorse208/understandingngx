@@ -47,6 +47,7 @@
 
 可以再make install将模块自动安装到 nginx的安装目录的子目录modules下。
 
+参考 https://www.nginx.com/resources/wiki/extending/converting/
 - 动态加载官方模块
 
 	在configure时，添加 --with-xxx=dynamic 即可，比如
@@ -130,3 +131,79 @@ will@will-ThinkPad-T400:~/nginx-1.12.0/work/modules/upstream$
 		
 ## 5. 编写一个模块
 ### 5.1 http模块源码组织结构
+
+下面将简单说明一个http类型的功能模块的代码结构。
+
+```c
+#include <ngx_config.h>
+#include <ngx_core.h>
+#include <ngx_http.h>
+
+//模块中使用到的数据结构定义，一般是模块的各个函数在不同的时机被调用时，用来传递一些信息。
+
+//函数声明
+//由于一般使用C进行模块编程，所以习惯于将所有下面将出现的函数都先进行声明
+//也可以在另外的头文件进行声明
+
+/*******关键数据结构定义，所有模块都必须实现**********/
+
+//模块支持的指令结构体定义
+static ngx_command_t  ngx_http_myupstream_commands[] =
+{
+
+    {
+        ngx_string("myupstream"), //指令名字
+        NGX_HTTP_MAIN_CONF | NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_HTTP_LMT_CONF | NGX_CONF_NOARGS,//指令在nginx.conf中能出现的位置、参数说明等
+        ngx_http_myupstream,//处理指令的回调函数
+        NGX_HTTP_LOC_CONF_OFFSET,
+        0,
+        NULL
+    },
+    {
+        ...
+    },
+    ngx_null_command
+};
+
+//模块上下文配置，即在nginx规定的8个特定阶段将要调用的函数，可以配置为NULL
+static ngx_http_module_t  ngx_http_myupstream_module_ctx =
+{
+    NULL,                              /* preconfiguration */
+    NULL,                  		/* postconfiguration */
+
+    NULL,                              /* create main configuration */
+    NULL,                              /* init main configuration */
+
+    NULL,                              /* create server configuration */
+    NULL,                              /* merge server configuration */
+
+    ngx_http_myupstream_create_loc_conf,       			/* create location configuration */
+    ngx_http_myupstream_merge_loc_conf         			/* merge location configuration */
+};
+
+//模块总体描述结构体，有些是nginx已经定义好的，有些由上面定义的上下文结构体、指令结构体填充
+ngx_module_t  ngx_http_myupstream_module =
+{
+    NGX_MODULE_V1,
+    &ngx_http_myupstream_module_ctx,           /* module context */
+    ngx_http_myupstream_commands,              /* module directives */
+    NGX_HTTP_MODULE,                       /* module type */
+    NULL,                                  /* init master */
+    NULL,                                  /* init module */
+    NULL,                                  /* init process */
+    NULL,                                  /* init thread */
+    NULL,                                  /* exit thread */
+    NULL,                                  /* exit process */
+    NULL,                                  /* exit master */
+    NGX_MODULE_V1_PADDING
+};
+
+//指令结构体中说明的所有回调函数都必须实现
+
+
+//如果在模块上下文配置中配置了非NULL成员，就必须实现
+
+//其他支撑函数
+
+
+```
