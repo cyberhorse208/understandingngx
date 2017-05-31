@@ -125,6 +125,24 @@ ngx_list_t * ngx_list_create(ngx_pool_t *pool, ngx_uint_t n, size_t size);
 void * ngx_list_push(ngx_list_t *l);
 ```
 由于链表的内存分配是基于内存池，所有内存的销毁由内存池进行，即链表没有销毁操作。
+遍历链表的代码框架：
+```c
+part = &list.part;
+data = part->elts;
+for (i = 0 ;; i++) {
+    if (i >= part->nelts) {
+        if (part->next == NULL) {
+            break;
+        }
+        part = part->next;
+        data = part->elts;
+        i = 0;
+    }
+
+    //...  data[i] ...
+}
+```
+
 ## ngx_queue_t
 nginx的双向循环链表结构。
 在 Nginx 的队列实现中，实质就是具有头节点的双向循环链表，这里的双向链表中的节点是没有数据区的，只有两个指向节点的指针。
@@ -256,8 +274,8 @@ struct ngx_buf_s {
     /* the buf's content is mmap()ed and must not be changed */
     unsigned         mmap:1;
 
-    /* 可回收，即这些buf可被释放 */
-    unsigned         recycled:1;
+    
+    unsigned         recycled:1; /* 可回收，即这些buf可被释放 */
     unsigned         in_file:1; /* 表示buf所包含的内容在文件中 */
     unsigned         flush:1;   /* 刷新缓冲区 */
     unsigned         sync:1;    /* 同步方式 */
@@ -267,7 +285,8 @@ struct ngx_buf_s {
     unsigned         last_shadow:1;
     unsigned         temp_file:1;
 
-    /* STUB */ int   num;
+    /* STUB */ 
+    int   num;
 };
 ```
 ## ngx_bufs_t
@@ -298,8 +317,3 @@ struct ngx_chain_s {
     ngx_chain_t  *next;
 };
 ```
-# ngx高级数据结构
-## ngx_hash_t
-## ngx_radix_tree_t
-## ngx_rbtree_t
-## ngx_pool_t
