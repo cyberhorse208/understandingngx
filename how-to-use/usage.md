@@ -18,24 +18,32 @@
 	
 ## 运行nginx
 - 将nginx可执行文件所在目录加入path环境变量中
-	-- sudo echo "export PATH=$PATH:/usr/local/nginx/sbin/" >> /etc/profile
-	-- source /etc/profile
+```bash
+	sudo echo "export PATH=$PATH:/usr/local/nginx/sbin/" >> /etc/profile
+	source /etc/profile
+```
 - 启动nginx
-	-- sudo nginx -c path_to_nginx.conf
+```bash
+	sudo nginx -c path_to_nginx.conf
+```
 	可以直接使用nginx/conf目录下的配置文件，也可以拷贝nginx.conf和mine.types到指定目录，然后使用此目录下的confi文件运行
 - 停止nginx
-	-- sudo nginx -s stop
+```bash
+	sudo nginx -s stop
+```
 - 更新配置文件
-	-- sudo nginx -s reload
-	
+```bash
+	sudo nginx -s reload
+```	
 - 检查安装
+	
 	如果使用默认的nginx.conf，安装完毕后，在浏览器里输入 localhost， 如果显示nginx的欢迎界面，就表示一切顺利，成功安装了。
 	
 - 更新nginx程序
-	-- 获得正在运行的nginx master的进程号n
-		ps uax|grep nginx|grep master
-	-- kill -WINCH n   //发送WINCH信号到旧的nginx主进程以杀掉旧的nginx子进程
-	-- kill -QUIT n  // 退出旧的nginx主进程 
-	-- rm -rf /usr/local/nginx/sbin/nginx.old  //删除老版本
-	--现在新版本的nginx就已经替换老的nginx了，而且实现了不停机升级。
-	
+```bash
+	ps uax|grep nginx|grep master #获得正在运行的nginx master的进程号n
+	kill -WINCH n   #发送WINCH信号到旧的nginx主进程以杀掉旧的nginx子进程
+	kill -QUIT n  #退出旧的nginx主进程 
+	rm -rf /usr/local/nginx/sbin/nginx.old  #删除老版本
+	#现在新版本的nginx就已经替换老的nginx了，而且实现了不停机升级。
+```	
