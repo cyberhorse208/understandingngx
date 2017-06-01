@@ -12,8 +12,14 @@
 
 相关tcp/ip原理:
 
-	TCP的接收缓存中，除了被kernel用作接收窗口（存储TCP连接中的数据）外，还需要存储尚未被应用程序读取的tcp报文（应用程序可能因为各种原因没有来得及读取报文，必须将这些报文缓存起来）。tcp_adv_win_scale > 0时，用来控制此二者占总缓存的比例。
-	tcp_adv_win_scale的值直接影响接收窗口大小，从而影响网络性能。比如，tcp_adv_win_scale=1 时，接收窗口大小为： 87380*（1-1/2^1)=43690; 如果一个网络连接的RTT为150ms，则在这个网络连接上能够获得的最大性能为  43690/0.150=291267 B/s， 约为290kB/s,速度相当慢。因此为了获得更大的性能，必须尽可能的提高守护进程的处理能力，尽可能的减少应用程序缓存，从而扩大TCP接收窗口大小，使得TCP能够开足马力运行。
+	TCP的接收缓存中，除了被kernel用作接收窗口（存储TCP连接中的数据）外，还需要存储尚未被应用程序读取的tcp报文
+	（应用程序可能因为各种原因没有来得及读取报文，必须将这些报文缓存起来）。
+	tcp_adv_win_scale > 0时，用来控制此二者占总缓存的比例。
+	tcp_adv_win_scale的值直接影响接收窗口大小，从而影响网络性能。
+	比如，tcp_adv_win_scale=1 时，接收窗口大小为： 87380*（1-1/2^1)=43690;
+	如果一个网络连接的RTT为150ms，则在这个网络连接上能够获得的最大性能为  43690/0.150=291267 B/s， 约为290kB/s,速度相当慢。
+	因此为了获得更大的性能，必须尽可能的提高守护进程的处理能力，尽可能的减少应用程序缓存,
+	从而扩大TCP接收窗口大小，使得TCP能够开足马力运行。
 
 
 - tcp_app_win
@@ -31,7 +37,9 @@
 意义:该文件保存了三个值，分别是
 
 > low：当TCP使用了低于该值的内存页面数时，TCP不会考虑释放内存。
+
 > presure：当TCP使用了超过该值的内存页面数量时，TCP试图稳定其内存使用，进入pressure模式，当内存消耗低于low值时则退出pressure状态。
+
 > high：允许所有tcp sockets用于排队缓冲数据报的页面量
 
 默认值: 44451	59269	88902
@@ -51,9 +59,11 @@
 
 意义:三个值，分别是
 
-> Min：为TCP socket预留用于接收缓冲的内存最小值。每个tcp socket都可以在建立后使用它。即使在内存出现紧张情况下tcp socket都至少会有这么多数量的内存用于接收缓冲
-> Default：为TCP socket预留用于接收缓冲的内存数量，默认情况下该值会影响其它协议使用的net.core.rmem_default 值，一般要低于net.core.rmem_default的值。该值决定了在tcp_adv_win_scale、tcp_app_win和tcp_app_win=0默认值情况下，TCP窗口大小为65535。
-> Max：用于TCP socket接收缓冲的内存最大值。该值不会影响net.core.rmem_max，"静态"选择参数SO_SNDBUF则不受该值影响。 
+> Min：为TCP socket预留用于接收缓冲的内存最小值。每个tcp socket都可以在建立后使用它。即使在内存出现紧张情况下tcp socket都至少会有这么多数量的内存用于接收缓冲.
+
+> Default：为TCP socket预留用于接收缓冲的内存数量，默认情况下该值会影响其它协议使用的net.core.rmem_default 值，一般要低于net.core.rmem_default的值。
+
+> Max：用于TCP socket接收缓冲的内存最大值。
 
 默认值: 4096	87380	6291456
 
@@ -72,8 +82,10 @@
 意义:三个值，分别是
 
 > Min：为TCP socket预留用于发送缓冲的内存最小值。每个tcp socket都可以在建立后使用它。
+
 > Default：为TCP socket预留用于发送缓冲的内存数量，默认情况下该值会影响其它协议使用的net.core.wmem_default 值，一般要低于net.core.wmem_default的值。
-> Max：用于TCP socket发送缓冲的内存最大值。该值不会影响net.core.wmem_max，"静态"选择参数SO_SNDBUF则不受该值影响
+
+> Max：用于TCP socket发送缓冲的内存最大值。
 
 默认值: 4096	16384	4194304
 
@@ -113,13 +125,6 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
-- tcp_autocorking
-
-意义:
-
-默认值: 1
-
-相关tcp/ip原理:
 
 - tcp_fack
 
@@ -231,7 +236,9 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
-	守护进程忙于做其他工作，来不及调用accept函数来接受新的连接请求，导致内核中TCP等待接受队列满。如果设置了此标志，则对新来的客户端连接请求（syn)直接发送reset消息。客户端就会表现为连不上服务器，体验较差。一般我们不能打开此标志，而是要着手于提高守护进程性能，从而能够接受更多的新连接，实在不行则需要扩充服务器。
+	守护进程忙于做其他工作，来不及调用accept函数来接受新的连接请求，导致内核中TCP等待接受队列满。
+	如果设置了此标志，则对新来的客户端连接请求（syn)直接发送reset消息。客户端就会表现为连不上服务器，体验较差。
+	一般我们不能打开此标志，而是要着手于提高守护进程性能，从而能够接受更多的新连接，实在不行则需要扩充服务器。
 
 - tcp_max_orphans
 
@@ -327,6 +334,7 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 	
+#### tcp 其他参数	
 - tcp_base_mss
 
 意义:
@@ -577,7 +585,9 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 意义:三个值，分别是
 
 > low：当UDP使用了低于该值的内存页面数时，UDP不会考虑释放内存。
+
 > presure：当UDP使用了超过该值的内存页面数量时，UDP试图稳定其内存使用，进入pressure模式，当内存消耗低于low值时则退出pressure状态。
+
 > high：允许所有UDP sockets用于排队缓冲数据报的页面量
 
 默认值: 88902	118538	177804
@@ -728,6 +738,14 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 意义:
 
 默认值: 
+
+相关tcp/ip原理:
+
+- tcp_autocorking
+
+意义:
+
+默认值: 1
 
 相关tcp/ip原理:
 
