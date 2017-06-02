@@ -4,9 +4,29 @@
 ## /proc/sys/net/ipv4下tcp/ip专用参数
 ### 1. tcp 相关参数
 #### tcp 窗口、缓存相关参数
+
+- tcp_window_scaling
+
+意义:设置tcp/ip会话的滑动窗口大小是否启用放大机制
+
+默认值: 1
+
+相关tcp/ip原理:
+
+	不开启窗口放大机制时，tcp的头部只有16bit空间来指名当前窗口大小，最大只能有65535.
+	在目前高延迟、高带宽普遍的互联网（长肥管道），这个最大窗口大小是很不合适的。
+	比如，你有个100Mbps链路，到www.t66y.com的延迟（rtt）为300ms。那么这条链路支持的最大性能是
+	100M/8 *0.3=3.75MB/s
+	但是最大窗口时65535时，能获得的最大性能是： 65535/0.3=213KB/s
+	只有链路支持最大性能的 213k/3.75M = 6%， 利用率相当低。
+	
+	开启窗口放大机制时，链路双方在3次握手时，将协商放大倍数（最大为2^14倍 https://tools.ietf.org/html/rfc1323 ）。
+	在双方都同意的前提下，协商出一个放大倍数（这个倍数在tcp头部的opt字段中指名，原来的16bit窗口值不变），然后在后续的所有报文中使用。
+	假如协商的放大倍数为8，那么上述的链路最大窗口就可以达到65535*8=512KB，能获得最大性能为1.7MB/s，利用率48%。
+
 - tcp_adv_win_scale
 
-意义:配置缓存开销，有两种情况：1）tcp_adv_win_scale < =0，此时这个参数用来控制tcp窗口扩张时的额外开销 overhead=bytes(1-1/2^(-tcp_adv_win_scale)) 2）tcp_adv_win_scale > 0，此时这个参数用来控制tcp总读缓存中，可用于应用程序缓存的大小 size=tcp总缓存 / 2^tcp_adv_win_scale
+意义:配置缓存开销，有两种情况：1）tcp_adv_win_scale < =0，此时这个参数用来控制tcp窗口扩张时的额外开销 overhead=bytes(1-1/2^(-tcp_adv_win_scale)) 2）tcp_adv_win_scale > 0，此时这个参数用来控制tcp总读缓存中，可用于应用程序缓存的大小 size=tcp总缓存 / 2 ^ tcp_adv_win_scale
 
 默认值: 1
 
@@ -34,32 +54,40 @@
 
 - tcp_mem
 
-意义:该文件保存了三个值，分别是
+意义:针对整个tcp协议栈使用内存控制，包含三个值（单位为页，与操作系统相关），分别是
 
 > low：当TCP使用了低于该值的内存页面数时，TCP不会考虑释放内存。
 
-> presure：当TCP使用了超过该值的内存页面数量时，TCP试图稳定其内存使用，进入pressure模式，当内存消耗低于low值时则退出pressure状态。
+> presure：当TCP使用了超过该值的内存页面数量时，TCP试图稳定其内存使用，进入pressure模式，当内存消耗低于low值时则退出pressure状态。在pressure模式下，tcp协议栈将降低所有tcp连接的发送和接收缓存大小。
 
-> high：允许所有tcp sockets用于排队缓冲数据报的页面量
+> high：最大内存使用量。如果TCP使用了这个数量的内存，将开始丢弃数据包，直到内存使用降低为止。
 
 默认值: 44451	59269	88902
 
 相关tcp/ip原理:
 
 
-- tcp_moderate_rcvbuf
-
-意义:
-
-默认值: 1
-
-相关tcp/ip原理:
-
-- tcp_rmem
+	
+- tcp_wmem
 
 意义:三个值，分别是
 
-> Min：为TCP socket预留用于接收缓冲的内存最小值。每个tcp socket都可以在建立后使用它。即使在内存出现紧张情况下tcp socket都至少会有这么多数量的内存用于接收缓冲.
+> Min：为每个TCP socket分配的用于发送缓冲的内存最小值。每个tcp socket都可以在建立后使用它。
+
+> Default：为每个TCP socket预留用于发送缓冲的内存数量，该值会覆盖其它协议使用的net.core.wmem_default 值，并且要低于net.core.wmem_default的值。
+
+> Max：用于每个TCP socket发送缓冲的内存最大值。
+
+默认值: 4096	16384	4194304
+
+相关tcp/ip原理:
+
+
+- tcp_rmem
+
+意义:三个值（单位为byte），分别是
+
+> Min：为TCP socket预留用于接收缓冲的内存最小值。每个tcp socket都可以在建立后使用它。即使在内存出现紧张情况下每个tcp socket都至少会有这么多数量的内存用于接收缓冲.
 
 > Default：为TCP socket预留用于接收缓冲的内存数量，默认情况下该值会影响其它协议使用的net.core.rmem_default 值，一般要低于net.core.rmem_default的值。
 
@@ -68,28 +96,37 @@
 默认值: 4096	87380	6291456
 
 相关tcp/ip原理:
+	
+	tcp_rmem一般情况下不需要改动，tcp协议栈能够自动调整到最有效的值。在优化tcp性能时，改动tcp_mem, tcp_wmem即可。
 
-- tcp_window_scaling
+- tcp_moderate_rcvbuf
 
-意义:设置tcp/ip会话的滑动窗口大小是否可变
+意义:设置是否开启接收窗口大小自动调整机制
 
 默认值: 1
 
 相关tcp/ip原理:
 
-- tcp_wmem
+	开启tcp接收窗口自动调整机制时，tcp将采用滑动窗口，自动调整窗口大小，使其最符合当前系统和网络环境，以达到最佳的性能。
+	如果关闭自动调整机制，将导致窗口大小不变，影响性能。
+	另外，在编程时，如果对socket使用
+	setsockopt(s,SOL_SOCKET,SO_RCVBUF,(const char*)&nRecvBuf,sizeof(int));
+	函数设置属性，将关闭窗口自动调整机制，一直维持指定窗口大小。
+	
+	滑动窗口移动规则：
+	1、窗口合拢：
+	在收到对端数据后，自己确认了数据的正确性，这些数据会被存储到缓冲区，等待应用程序获取。
+	但这时候因为已经确认了数据的正确性，需要向对方发送确认响应ACK，又因为这些数据还没有被应用进程取走，这时候便需要进行窗口合拢，缓冲区的窗口左边缘向右滑动。
+	注意响应包括：ACK序号（期望对方下一次发送数据包的序号），当前窗口大小。
 
-意义:三个值，分别是
+	2、窗口张开：
+	窗口收缩后，应用进程一旦从缓冲区中取出数据，TCP的滑动窗口需要进行扩张，这时候窗口的右边缘向右扩张，
+	实际上窗口这是一个环形缓冲区，窗口的右边缘扩张会使用原来被应用进程取走内容的缓冲区。
+	在窗口进行扩张后，需要使用ACK通知对端，这时候ACK的序号依然是上次确认收到包的序号。
+	一个对方发送的序号，可能因为窗口张开会被响应（ACK）多次。
 
-> Min：为TCP socket预留用于发送缓冲的内存最小值。每个tcp socket都可以在建立后使用它。
-
-> Default：为TCP socket预留用于发送缓冲的内存数量，默认情况下该值会影响其它协议使用的net.core.wmem_default 值，一般要低于net.core.wmem_default的值。
-
-> Max：用于TCP socket发送缓冲的内存最大值。
-
-默认值: 4096	16384	4194304
-
-相关tcp/ip原理:
+	3、窗口收缩：
+	窗口的右边缘向左滑动，称为窗口收缩，Host Requirement RFC强烈建议不要这样做，但TCP必须能够在某一端产生这种情况时进行处理。
 	
 #### tcp拥塞控制
 相关原理参考
@@ -142,7 +179,18 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
-
+	tcp fast open，就是在3次握手的时候也用来交换数据。
+	产生这个需求的原因有2：
+	1，3次握手至少造成一个rtt的延迟，降低了新建连接的响应速度
+	2，如果采用keepalive机制，减少新建连接，会遇到keepalive的idle时间限制，超时的长连接会被中断，需要重新连接 （www.ietf.org/proceedings/80/slides/tcpm-3.pdf）。
+	3，原始tcp协议支持在syn报文中携带数据，但是必须在3次握手之后。
+	tfo的实现方式：
+	服务器和客户端都支持tcp_fastopen，
+	第一次握手时，服务器给客户端一个cookie，客户端记录此cookie，然后按照正常tcp流程运行。
+	后续再次新建连接，需要握手时，客户端在syn包中包含记录的cookie，并携带数据；
+	服务器验证cookie，发现客户端是之前连接过的合法客户端，就直接响应数据，无须3次握手。
+	如下图：
+	![tfo] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_fast_open.jpg)
 - tcp_mtu_probing
 
 意义:是否开启tcp层路径mtu发现，自动调整tcp窗口等
