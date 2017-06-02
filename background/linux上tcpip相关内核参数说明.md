@@ -259,7 +259,7 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 #### tcp 状态机相关参数
 参考 http://www.jaminzhang.github.io/network/TCP-Finite-State-Machine/
 
-![tfo] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_stat_mechine.jpeg)	
+![statmechine] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_stat_mechine.jpeg)	
 
 
 - tcp_fin_timeout
@@ -384,7 +384,7 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 	再把这个连接放到ACCEPT队列（即已完成握手队列）中。
 	服务器在调用accept时，其实就是直接从ACCEPT队列中取出已经建立成功的连接套接字而已。
 	如下图所示：
-![tfo] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_backlog.jpeg)	
+![backlog] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_backlog.jpeg)	
 
 
 - tcp_orphan_retries
