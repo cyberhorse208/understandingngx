@@ -256,7 +256,12 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 相关tcp/ip原理:
 
 
-#### tcp 时间相关参数
+#### tcp 状态机相关参数
+参考 http://www.jaminzhang.github.io/network/TCP-Finite-State-Machine/
+
+![tfo] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_stat_mechine.jpeg)	
+
+
 - tcp_fin_timeout
 
 意义:本端主动断开的socket连接后，TCP保持在FIN-WAIT-2状态的时间。
@@ -268,8 +273,43 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 	当服务器怀疑对端因为某种原因已经无响应后，主动断开连接。那么服务器端的tcp状态将依次转换为
 	FIN_WAIT_1 ---> FIN_WAIT_2 ---> TIME_WAIT
 	在每个状态上都有相应的保持时间。在FIN_WAIT_2状态上的保持时间由tcp_fin_timeout指定。超时后进入下一状态。
-	每个tcp连接FIN_WAIT_2状态上消耗内存1.5kb，如果服务器有大量FIN_WAIT_2状态连接，超时时间设置过长，会占用较多内存。
+	每个tcp连接FIN_WAIT_2状态上消耗内存1.5kb，如果服务器有大量FIN_WAIT_2状态连接，超时时间设置过长，会占用内存，而且更重要的是占用了端口。
 
+- tcp_tw_recycle
+
+意义:是否打开快速 TIME-WAIT sockets 回收
+
+默认值: 0
+
+相关tcp/ip原理:
+
+- tcp_tw_reuse
+
+意义:是否允许重新应用处于TIME-WAIT状态的socket用于新的TCP连接
+
+默认值: 0
+
+相关tcp/ip原理:
+
+	tcp socket在处于TIME-WAIT状态2MSL时间后，才会转移到CLOSE状态。在此期间，这个socket还是占用原来的ip和端口。
+	因此，如果在这个时间内想重用这个ip和端口，将会收到 “Address already in use“错误提示，
+	在此期间，服务器程序重启会失败。
+	
+	tcp_tw_reuse 应该在连接的发起方使用，而不能在被连接方使用。
+	举例来说：
+	客户端向服务器端发起 HTTP 请求，服务端响应后主动关闭连接，
+	于是 TIME_WAIT 便留在了服务端，此类情况使用「tcp_tw_reuse」是无效的，因为服务端是被连接方，所以不存在复用连接一说。
+	比如说服务端是 PHP，它查询另一个 MySQL 服务端，然后主动断开连接，于是 TIME_WAIT 就落在了 PHP 一侧，
+	此类情况下使用「tcp_tw_reuse」是有效的，因为此时 PHP 相对于 MySQL 而言是客户端，它是连接的发起方，所以可以复用连接。
+
+	
+- tcp_max_tw_buckets
+
+意义: 系统在同时所处理的最大timewait sockets 数目。如果超过此数的话，time-wait socket 会被立即砍除并且显示警告信息
+
+默认值: 16384
+
+相关tcp/ip原理:
 
 
 
@@ -337,16 +377,15 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
+	服务器绑定、监听了某个端口后，这个端口的SYN队列和ACCEPT队列就建立好了。
+	客户端使用connect向服务器发起TCP连接，客户端的SYN包到达了服务器后，
+	内核会把这一信息放到SYN队列（即未完成握手队列）中，同时回一个SYN+ACK包给客户端。
+	一段时间后，在客户端再次发来了针对服务器SYN包的ACK网络分组时，内核会把连接从SYN队列中取出，
+	再把这个连接放到ACCEPT队列（即已完成握手队列）中。
+	服务器在调用accept时，其实就是直接从ACCEPT队列中取出已经建立成功的连接套接字而已。
+	如下图所示：
+![tfo] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_backlog.jpeg)	
 
-	![tfo] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_backlog.jpeg)	
-
-- tcp_max_tw_buckets
-
-意义: 系统在同时所处理的最大timewait sockets 数目。如果超过此数的话，time-wait socket 会被立即砍除并且显示警告信息
-
-默认值: 16384
-
-相关tcp/ip原理:
 
 - tcp_orphan_retries
 
@@ -426,6 +465,9 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
+	MSS (Max Segment Size)， tcp最大分片大小，超过这个大小的数据都会被切分，然后以MSS的大小发送到网络。
+	
+	
 - tcp_challenge_ack_limit
 
 意义:
@@ -634,23 +676,6 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 默认值: 3
 
 相关tcp/ip原理:
-
-- tcp_tw_recycle
-
-意义:是否打开快速 TIME-WAIT sockets 回收
-
-默认值: 0
-
-相关tcp/ip原理:
-
-- tcp_tw_reuse
-
-意义:是否允许重新应用处于TIME-WAIT状态的socket用于新的TCP连接
-
-默认值: 0
-
-相关tcp/ip原理:
-
 
 
 - tcp_workaround_signed_windows
