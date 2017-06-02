@@ -3,6 +3,7 @@
 
 ## /proc/sys/net/ipv4下tcp/ip专用参数
 ### 1. tcp 相关参数
+参考  https://www.frozentux.net/ipsysctl-tutorial/chunkyhtml/tcpvariables.html
 #### tcp 窗口、缓存相关参数
 
 - tcp_window_scaling
@@ -190,7 +191,11 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 	后续再次新建连接，需要握手时，客户端在syn包中包含记录的cookie，并携带数据；
 	服务器验证cookie，发现客户端是之前连接过的合法客户端，就直接响应数据，无须3次握手。
 	如下图：
-	![tfo] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_fast_open.jpg)
+
+![tfo] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_fast_open.jpg)
+
+	另外，linux 3.7.1以上支持tcp_fastopen, nginx 的listen指令也支持fastopen参数。
+	
 - tcp_mtu_probing
 
 意义:是否开启tcp层路径mtu发现，自动调整tcp窗口等
@@ -243,20 +248,28 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 #### tcp 时间相关参数
 - tcp_fin_timeout
 
-意义:本端断开的socket连接，TCP保持在FIN-WAIT-2状态的时间。对方可能会断开连接或一直不结束连接或不可预料的进程死亡。如果您的机器为负载很重的web服务器，您可能要冒内存被大量无效数据报填满的风险，FIN-WAIT-2 sockets 的危险性低于 FIN-WAIT-1，因为它们最多只吃 1.5K 的内存，但是它们存在时间更长。
+意义:本端主动断开的socket连接后，TCP保持在FIN-WAIT-2状态的时间。
 
 默认值: 60
 
 相关tcp/ip原理:
 
+	当服务器怀疑对端因为某种原因已经无响应后，主动断开连接。那么服务器端的tcp状态将依次转换为 FIN_WAIT_1 ---> FIN_WAIT_2 ---> TIME_WAIT
+	在每个状态上都有相应的保持时间。在FIN_WAIT_2状态上的保持时间由tcp_fin_timeout指定。超时后进入下一状态。
+	每个tcp连接FIN_WAIT_2状态上消耗内存1.5kb，如果服务器有大量FIN_WAIT_2状态连接，超时时间设置过长，会占用较多内存。
 
-- tcp_keepalive_intvl
 
-意义:
 
-默认值: 75
+
+- tcp_keepalive_time
+
+意义:表示从最后一个包结束后多少秒内没有活动，就发送keepalive包保持连接
+
+默认值: 7200
 
 相关tcp/ip原理:
+
+
 
 - tcp_keepalive_probes
 
@@ -266,14 +279,18 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
-- tcp_keepalive_time
+- tcp_keepalive_intvl
 
-意义:表示从最后一个包结束后多少秒内没有活动，才发送keepalive包保持连接，默认7200s，理想可设为1800s，即如果非正常断开，1800s后可通过keepalive知
+意义:当发送keepalive probe后，等待多长时间的响应。
 
-默认值: 7200
+默认值: 75
 
+
+	
 相关tcp/ip原理:
 
+	一个连接上没有报文传输，等待tcp_keepalive_time 秒后，发送tcp_keepalive_probes个 keepalive probe，等待tcp_keepalive_intvl秒，看是否有响应。如果没有，则断开连接。
+	
 #### tcp连接相关参数
 
 - tcp_abort_on_overflow
