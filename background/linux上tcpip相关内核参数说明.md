@@ -4,6 +4,8 @@
 ## /proc/sys/net/ipv4下tcp/ip专用参数
 ### 1. tcp 相关参数
 参考  https://www.frozentux.net/ipsysctl-tutorial/chunkyhtml/tcpvariables.html
+
+https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt
 #### tcp 窗口、缓存相关参数
 
 - tcp_window_scaling
@@ -204,6 +206,30 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
+	MTU: Max Transfer Unit, 链路层单个数据帧的最大值，超过这个长度的数据都要被分成多个帧进行传输。
+	以太网中，MTU为1500。因此，在tcp协议里，最大的tcp数据分片长度为：
+	MSS = MTU-IP Header - TCP Header = 1500 - 20 - 20 = 1460 B
+	互联网上，一条链路可能需要经过很多节点，每个节点的MTU都有可能不一样，整条链路的MTU由最小的MTU决定。
+	开启tcp路径发现，就是要发现链路最小的MTU，然后发送不超过这个MTU决定的MSS大小的数据包，
+	这样能够避免IP层、链路层的分包，从而提高节点处理速度，进而提高整个链路的速度。
+
+- tcp_probe_interval
+
+意义:指定间隔多长时间进行一次路径MTU发现
+
+默认值: 600
+
+相关tcp/ip原理:
+
+- tcp_probe_threshold
+
+意义:定义何时停止路径MTU发现
+
+默认值: 8
+
+相关tcp/ip原理:
+
+
 - tcp_pacing_ca_ratio
 
 意义:
@@ -220,21 +246,6 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
-- tcp_probe_interval
-
-意义:
-
-默认值: 600
-
-相关tcp/ip原理:
-
-- tcp_probe_threshold
-
-意义:
-
-默认值: 8
-
-相关tcp/ip原理:
 
 - tcp_recovery
 
@@ -254,7 +265,8 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
-	当服务器怀疑对端因为某种原因已经无响应后，主动断开连接。那么服务器端的tcp状态将依次转换为 FIN_WAIT_1 ---> FIN_WAIT_2 ---> TIME_WAIT
+	当服务器怀疑对端因为某种原因已经无响应后，主动断开连接。那么服务器端的tcp状态将依次转换为
+	FIN_WAIT_1 ---> FIN_WAIT_2 ---> TIME_WAIT
 	在每个状态上都有相应的保持时间。在FIN_WAIT_2状态上的保持时间由tcp_fin_timeout指定。超时后进入下一状态。
 	每个tcp连接FIN_WAIT_2状态上消耗内存1.5kb，如果服务器有大量FIN_WAIT_2状态连接，超时时间设置过长，会占用较多内存。
 
@@ -263,7 +275,7 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 - tcp_keepalive_time
 
-意义:表示从最后一个包结束后多少秒内没有活动，就发送keepalive包保持连接
+意义:表示连接上从最后一个包结束后多少秒内没有活动，就发送keepalive包保持连接
 
 默认值: 7200
 
@@ -289,7 +301,9 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 	
 相关tcp/ip原理:
 
-	一个连接上没有报文传输，等待tcp_keepalive_time 秒后，发送tcp_keepalive_probes个 keepalive probe，等待tcp_keepalive_intvl秒，看是否有响应。如果没有，则断开连接。
+	一个连接上没有报文传输，等待tcp_keepalive_time 秒后，发送tcp_keepalive_probes个 keepalive probe，
+	每个 keepalive probe之间等待tcp_keepalive_intvl秒，看是否有响应。如果所有 keepalive probe都发送完还是没有响应，则断开连接。
+	
 	
 #### tcp连接相关参数
 
@@ -307,12 +321,13 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 - tcp_max_orphans
 
-意义:系统所能处理不属于任何进程的TCP sockets最大数量。假如超过这个数量，那么不属于任何进程的连接会被立即reset，并同时显示警告信息。之所以要设定这个限制，纯粹为了抵御那些简单的 DoS 攻击，千万不要依赖这个或是人为的降低这个限制
+意义:系统所能处理不属于任何进程的TCP sockets最大数量。
 
 默认值: 16384
 
 相关tcp/ip原理:
 
+	假如超过这个数量，那么不属于任何进程的连接会被立即reset，并同时显示警告信息。之所以要设定这个限制，纯粹为了抵御那些简单的 DoS 攻击，千万不要依赖这个或是人为的降低这个限制
 
 - tcp_max_syn_backlog
 
@@ -321,6 +336,9 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 默认值: 128
 
 相关tcp/ip原理:
+
+
+	![tfo] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_backlog.jpeg)	
 
 - tcp_max_tw_buckets
 
