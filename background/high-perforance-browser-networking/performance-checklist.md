@@ -21,12 +21,12 @@ Optimizing TCP performance pays high dividends, regardless of the type of applic
 
 -- 使用小的初始cwnd传输一个64KB文件，需要264ms，过程如此：
 
-![small-cwnd-init](https://github.com/cyberhorse208/understandingngx/raw/master/background/fetchfile-with-slow-start-small-inicwnd.png)
+![small-cwnd-init](https://github.com/cyberhorse208/understandingngx/raw/master/background/high-perforance-browser-networking/fetchfile-with-slow-start-small-inicwnd.png)
 
 
 -- 使用初始cwnd=10传输，只需要96ms，过程如下：
 
-![large-cwnd-init](https://github.com/cyberhorse208/understandingngx/raw/master/background/fetchfile-with-slow-start-large-inicwnd.png)
+![large-cwnd-init](https://github.com/cyberhorse208/understandingngx/raw/master/background/high-perforance-browser-networking/fetchfile-with-slow-start--large-inicwnd.png)
 
 
 *    Ensure that window scaling is enabled.
