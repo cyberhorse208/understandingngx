@@ -194,9 +194,20 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 	服务器验证cookie，发现客户端是之前连接过的合法客户端，就直接响应数据，无须3次握手。
 	如下图：
 
-![tfo] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_fast_open.jpg)
+![tfo](https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_fast_open.jpg)
 
 	另外，linux 3.7.1以上支持tcp_fastopen, nginx 的listen指令也支持fastopen参数。
+
+
+- tcp_slow_start_after_idle
+
+意义: 链路上有一段时间没有包传输后，此参数控制是否重新进入慢启动
+
+默认值: 1
+
+相关tcp/ip原理:
+
+	链路上空闲一段时间后，我们假设网络状况可能会有变化，因此重新开始慢启动。
 	
 - tcp_mtu_probing
 
@@ -259,7 +270,7 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 #### tcp 状态机相关参数
 参考 http://www.jaminzhang.github.io/network/TCP-Finite-State-Machine/
 
-![statmechine] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_stat_mechine.jpeg)	
+![statmechine](https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_stat_mechine.jpeg)	
 
 
 - tcp_fin_timeout
@@ -301,7 +312,7 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 	于是 TIME_WAIT 便留在了服务端，此类情况使用「tcp_tw_reuse」是无效的，因为服务端是被连接方，所以不存在复用连接一说。
 	比如说服务端是 PHP，它查询另一个 MySQL 服务端，然后主动断开连接，于是 TIME_WAIT 就落在了 PHP 一侧，
 	此类情况下使用「tcp_tw_reuse」是有效的，因为此时 PHP 相对于 MySQL 而言是客户端，它是连接的发起方，所以可以复用连接。
-
+	复用连接能够带来最明显的好处就是不用再次进行3次握手就能够传输数据，至少节约1个rtt时间。
 	
 - tcp_max_tw_buckets
 
@@ -384,7 +395,8 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 	再把这个连接放到ACCEPT队列（即已完成握手队列）中。
 	服务器在调用accept时，其实就是直接从ACCEPT队列中取出已经建立成功的连接套接字而已。
 	如下图所示：
-![backlog] (https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_backlog.jpeg)	
+
+![backlog](https://github.com/cyberhorse208/understandingngx/raw/master/background/tcp_backlog.jpeg)	
 
 
 - tcp_orphan_retries
@@ -613,14 +625,6 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 - tcp_sack
 
 意义:是否启用有选择的应答（Selective Acknowledgment），这可以通过有选择地应答乱序接收到的报文来提高性能（这样可以让发送者只发送丢失的报文段）；（对于广域网通信来说）这个选项应该启用，但是这会增加对 CPU 的占用
-
-默认值: 1
-
-相关tcp/ip原理:
-
-- tcp_slow_start_after_idle
-
-意义: 如果设置满足RFC2861定义的行为，在从新开始计算拥塞窗口前延迟一些时间，这延迟的时间长度由当前rto决定.
 
 默认值: 1
 
