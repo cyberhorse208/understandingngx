@@ -437,6 +437,33 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 默认值: 300
 
+	tcp_reordering和tcp_max_reordering的值与快速重传机制有关。
+	
+	快速重传不依赖定时器的超时，而是依靠ACK确认包来进行重传。一旦认定出现了特定数量的重复ACK确认包，就认为需要进行重传。使用快速重传相比RTO超时重传通常可以更高效的修复TCP丢包问题。
+	
+	快速重传是基于一个前提：即按照RFC5681，当TCP收到一个乱序报文的时候应该立即回复ACK确认包，而不会延迟ACK(延迟ACK介绍参考之前文章介绍)确认。另外RFC5681还指出如果接收序列号空间存在洞，新接收的报文完全填充了这个洞或者部分填充了这个洞，TCP也应该立即回复一个ACK确认包以便发送端及时获取接收端相关的信息。
+
+	 我们举个例子假设有5个TCP报文，P1(1-10)、P2(11-20)、P3(21-30)、P4(31-40)、P5(41-50)，其中括号中标注的是报文的比特系列号，每个报文的长度都为10bytes，发送端依次发送这5个报文。
+	 	
+	产生重复ACK报文的情况有3种：
+	
+	1. 报文丢失
+
+	 假设P2报文在网络传输过程中丢失，P1、P3、P4、P5报文依次按序到达，接收端收到这P1的时候发送ack=11的确认包(实际上这里可能会延迟发送ACK报文，为了描述简单我们假设立即发送ACK报文)，接收端收到P3的时候发现是乱序的报文则会立即回复ack=11确认包，同样后面收到P4和P5的时候还是会回复ack=11的确认包。这样发送端就会连续接收到4个ack=11的确认包，后面三个确认包因为和第一个ack number重复，因为称呼为duplicate ACK。因此发送端就可以依据dup ACK来推测接收端的接收情况。
+	 
+	 2，报文乱序
+	 
+	 如果网络传输过程中发生乱序导致接收端接收顺序变为P1、P3、P2、P4、P5，这样的情况下也会产生一个dup ACK。
+	 
+	 3，IP层重复报文
+	 
+	 IP层重复提交了ACK报文给TCP层。
+	 
+	 因此，我们仅仅通过一个dup ACK并不能可靠的确认是发生了丢包还是发生了乱序传输，因此会存在一个门限(duplicate ACK threshold或者叫做dupthresh)，当TCP收到的dup ACK数超过这个门限的时候，就会认为发生了丢包，进而初始化一个快速重传。
+	 
+	 最初协议中给出的dupthresh这个门限是3，但是RFC 4653给出了一种调整dupthresh的方法。Linux中则可以通过**tcp_reordering**来设置默认值，另外Linux可能还会根据乱序测量的结果来更新实际的dupthresh。dupthresh的范围最终会在**tcp_reordering**和**tcp_max_reordering**之间。
+	
+
 
 - tcp_retrans_collapse
 
@@ -446,6 +473,7 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
+
 - tcp_retries1
 
 意义:放弃回应一个TCP连接请求前进行重传的次数
@@ -453,6 +481,10 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 默认值: 3
 
 相关tcp/ip原理:
+
+	根据rfc1122，存在一个阈值R1，当重传次数或者时间超过R1时，tcp向ip层发出“negative advice”，触发ip层的dead-gateway检测（MTU探测、路由刷新等）
+	而R1的计算方式就由tcp_retries1指明。
+
 
 - tcp_retries2
 
@@ -462,15 +494,69 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
+	linux内核会根据tcp_retries2计算出一个timeout，超过这个timeout秒后，不再进行数据包重传。
+	计算方式为：
+```c
+// rto_base为200ms，TCP_RTO_MAX为120000ms
+
+    		if (tcp_retries2 <= 9)
+    			timeout = ((2 << tcp_retries2) - 1) * rto_base;
+    		else
+    			timeout = ((2 << 9) - 1) * rto_base +
+    				(tcp_retries2 - 9) * TCP_RTO_MAX;
+```
 
 - tcp_syn_retries
+	因此，如果数据包重传消耗时间已经超过了timeout时，即使还没有到tcp_retries2的次数，也停止重传。
 
-意义:本机向外发起TCP SYN连接超时重传的次数，不应该高于255；该值仅仅针对外出的连接，对于进来的连接由tcp_retries1控制
+意义:
+	本机向外发起TCP SYN连接超时重传的次数，不应该高于255；该值仅仅针对外出的连接，对于进来的连接由tcp_retries1控制
 
 默认值: 6
 
 相关tcp/ip原理:
 	
+
+- tcp_sack
+
+意义:是否启用有选择的应答（Selective Acknowledgment），这可以通过有选择地应答乱序接收到的报文来提高性能
+默认值: 1
+
+相关tcp/ip原理:
+	
+	如果发送端发送了5个报文p1,p2,p3,p4,p5，接收端只收到了p1,p3,p4,p5，那么接收端可以发送p1的ACK （累积确认，用于使发送端窗口右移），p3,p4,p5的SACK，告诉发送端p3,p4.p5已经收到，无须重传，可以释放他们占用的缓存。
+	
+	SACK在tcp的头部option中，最多能够一次 SACK 4个报文段。
+
+	发送端维护一个未被确认的重传报文段队列，报文段未被确认前是不能释放的。重传送队列中的每个报文段都有一个标志位“SACKed”标识该报文段是否被SACK过，对于已经被SACK过的块，在重传时将被跳过。
+	
+- tcp_frto
+
+意义:
+
+默认值: 2
+
+相关tcp/ip原理:
+
+
+- tcp_early_retrans
+
+意义:
+
+默认值: 3
+
+相关tcp/ip原理:
+
+
+- tcp_dsack
+
+意义:是否允许TCP发送“两个完全相同”的SACK
+
+默认值: 1
+
+相关tcp/ip原理:
+
+
 #### tcp 其他参数	
 - tcp_base_mss
 
@@ -492,21 +578,6 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 相关tcp/ip原理:
 
 
-- tcp_dsack
-
-意义:是否允许TCP发送“两个完全相同”的SACK
-
-默认值: 1
-
-相关tcp/ip原理:
-
-- tcp_early_retrans
-
-意义:
-
-默认值: 3
-
-相关tcp/ip原理:
 
 - tcp_ecn
 
@@ -524,15 +595,6 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
-
-
-- tcp_frto
-
-意义:
-
-默认值: 2
-
-相关tcp/ip原理:
 
 - tcp_fwmark_accept
 
@@ -624,14 +686,6 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
-
-- tcp_sack
-
-意义:是否启用有选择的应答（Selective Acknowledgment），这可以通过有选择地应答乱序接收到的报文来提高性能（这样可以让发送者只发送丢失的报文段）；（对于广域网通信来说）这个选项应该启用，但是这会增加对 CPU 的占用
-
-默认值: 1
-
-相关tcp/ip原理:
 
 - tcp_stdurg
 
