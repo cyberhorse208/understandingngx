@@ -166,14 +166,6 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 相关tcp/ip原理:
 
 
-- tcp_fack
-
-意义:是否打开FACK拥塞避免和快速重传功能
-
-默认值: 1
-
-相关tcp/ip原理:
-
 - tcp_fastopen
 
 意义:
@@ -467,7 +459,7 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 - tcp_retrans_collapse
 
-意义:
+意义:是否开启重传重组包功能
 
 默认值: 1
 
@@ -520,6 +512,7 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 - tcp_sack
 
 意义:是否启用有选择的应答（Selective Acknowledgment），这可以通过有选择地应答乱序接收到的报文来提高性能
+
 默认值: 1
 
 相关tcp/ip原理:
@@ -529,15 +522,42 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 	SACK在tcp的头部option中，最多能够一次 SACK 4个报文段。
 
 	发送端维护一个未被确认的重传报文段队列，报文段未被确认前是不能释放的。重传送队列中的每个报文段都有一个标志位“SACKed”标识该报文段是否被SACK过，对于已经被SACK过的块，在重传时将被跳过。
+
+
+- tcp_fack
+
+意义:是否打开FACK快速重传功能
+
+默认值: 1
+
+相关tcp/ip原理:
+
+	FACK（forward acknowledgement）是基于SACK的，FACK通过记录SACK块中系列号最大(forward-most)的SACK块来推测丢包信息。
+	
+	因为SACK块与ACK的值之间必然存在空洞，所以最大的SACK块与AC块之间的差值大于tcp_reordering个数据包的大小时，必然是ACK+1开始的数据包丢失了。
+	
+	启用FACK的最大好处是可以尽可能快的得知丢包信息。比如，不启用FACK的情况下，需要等待 tcp_reordering个重复的ACK包，才能确定发生丢包。
+	
+	例如：
+	
+	server端依次发出P1(0-9)、P2(10-19)、P3(20-29)、P4(30-39)、P5(40-49)，P6(50-59)。假设client端正常收到了P1包并回复了ACK确认包，P2、P3，P4，P5由于网络拥塞等原因丢失，client在收到P6时候，合并ACK后回复了一个Ack=10的确认包，并携带P6有SACK块信息（一个TCP头的option中最多4个SACK块），这样server在收到P1的确认包和P6的dup ACK时候，就可以根据dup ACK中的SACK信息得知client端收到了P1报文和P6报文，计算出P1和P6两个数据包中间间隔了4个数据包，达到了dup ACK门限(默认为3)，进而推测出P2报文丢失。
+	
 	
 - tcp_frto
 
-意义:
+意义:设定RTO之后，观察多少个ACK，以确定真正执行重传。
 
 默认值: 2
 
 相关tcp/ip原理:
 
+	F-RTO的基本思想是判断RTO是否正常，从而决定是否执行重传。方法是观察RTO之后的两个ACK。如果ACK不是冗余ACK，并且确认的包不是重传的，会认为RTO是虚假的就不执行重传。如果判断RTO是真实的，就进行重传（需要进入慢启动）。
+	
+	在传输链路RTT抖动比较大的场景下(例如无线网络)，FRTO可以有效的减少后续的虚假重传从而提升TCP性能。
+	
+	虚假重传(Spurious retransmission)产生场景包括：包传输中重排序、传输中发生包复制、ACK确认包传输中丢失等等。如果由于链路时延变化或者负载变化等因素导致RTT突然变大等原因，TCP的发送端可能还没收到ACK确认包就已经RTO超时而触发重传。
+	
+	虚假超时重传会降低网络性能，其主要由两方面的影响，一个是会导致重传已经发出的但是还没有收到ACK确认的数据，而这部分数据包的ACK报文可能只是延迟到达而已，因此对应的重传是不必要的，另一方面是虚假超时后进入慢启动阶段，每当收到一个ACK确认包的时候可以发出两个数据包，而原来初传的数据包实际上并没有丢失，因此增加了网络负载。
 
 - tcp_early_retrans
 
@@ -547,15 +567,30 @@ http://www.blog.csdn.net/dog250/article/details/52962727
 
 相关tcp/ip原理:
 
+	ER （early retransmit）是在没有新数据可以发送的场景下降低快速重传dup ACK的门限，dup ACK是由乱序TCP报文触发的，但是发出的总数据包的个数少于4个的时候，就会因为没有足够的dup ACK而不能触发快速重传(假设默认dup ACK门限是3)。
+
 
 - tcp_dsack
 
-意义:是否允许TCP发送“两个完全相同”的SACK
+意义:是否使能DSACK
 
 默认值: 1
 
 相关tcp/ip原理:
 
+	在发生虚假重传时，接收端接受到了重复的数据包，那么如何通知发送端不要再发送重复数据包呢？RFC2883定义了DSACK，用来通知发送端发生了虚假重传。
+	
+	DSACK基于SACK机制，通过使用SACK的第一个块来传递触发ACK确认包的序列号，无须额外的协商。发送端可以根据这个第一个块来推测是否发送了重复报文。
+	
+	接收端发送DSACK的处理逻辑：
+	
+	一个DSACK块只用来传递一个接收端最近接收到的重复报文的系列号，每个SACK选项中最多有一个DSACK块。每个重复包最多在一个DSACK块中上报一次。如果接收端依次发送了两个带有相同DSACK块信息的ACK报文，则表示接收端接收了两次重复包。
+	
+	如果收到重复报文，第一个SACK块应该应该指定触发这个ACK确认包的系列号。如果这个重复报文是一个大的不连续块的一部分，那么接下来的这个SACK块应该指定这个大的不连续块，额外的SACK块应该按照RFC2018指定的顺序排列。
+	
+	发送端接收到SACK报文时，处理逻辑：
+	
+	把第一个SACK块与这个ACK报文的ack number比较(而不是和当前已经接收到的最大的ack number比较)，如果小于等于ack number则说明是DSACK块，如果大于ack number则应该与第二个SACK块比较，如果第二个SACK块包含第一个SACK块，则说明第一个SACK块为DSACK块，如果上面两个条件都不满足说明第一个SACK块是普通的SACK块。
 
 #### tcp 其他参数	
 - tcp_base_mss
